@@ -24,5 +24,7 @@ class Reminder(Base):
     tts_audio_id = Column(String, nullable=True)
     tts_synthesized_at = Column(DateTime(timezone=True), nullable=True)
 
+    failure_reason = Column(String, nullable=True)
+
     user = relationship("User", back_populates="reminders")
     task = relationship("Task", back_populates="reminders")

@@ -199,6 +199,7 @@ def test_reminder_tick_routes_by_channel(monkeypatch, channel):
                 user_id=user.id,
                 device_code=f"dev-{uuid.uuid4().hex[:8]}",
                 name="Test Device",
+                last_seen_at=datetime.now(timezone.utc),
             )
             seed_db.add(device)
             seed_db.commit()
@@ -223,9 +224,8 @@ def test_reminder_tick_routes_by_channel(monkeypatch, channel):
         # ── Recording stubs for both dispatch legs ──
         device_calls: list[tuple] = []
 
-        def recording_queue_device_command(db, device_id, command_type, payload):
+        def recording_queue_device_command(db, device_id, command_type, payload, expires_at=None):
             device_calls.append((device_id, command_type, payload))
-            # Return a sentinel — the tick ignores the return value.
             return None
 
         monkeypatch.setattr(
@@ -474,6 +474,7 @@ def test_reminder_tick_makes_no_real_whatsapp_call(channels):
                     user_id=user.id,
                     device_code=f"dev-{uuid.uuid4().hex[:8]}",
                     name="Test Device",
+                    last_seen_at=datetime.now(timezone.utc),
                 )
                 seed_db.add(device)
                 seed_db.commit()

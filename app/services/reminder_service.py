@@ -218,3 +218,23 @@ def update_reminder_tts_state(
     db.commit()
     db.refresh(reminder)
     return reminder
+
+
+def update_reminder_failure_reason(
+    db: Session,
+    reminder_id: str,
+    reason: str,
+) -> Reminder:
+    """Persist a short Indonesian failure reason on the reminder row.
+
+    Stored independently from ``status`` so the dashboard can render
+    context next to the badge ("gagal · device offline ...") without
+    parsing free-form fields elsewhere.
+    """
+    reminder = db.query(Reminder).filter(Reminder.id == reminder_id).one_or_none()
+    if reminder is None:
+        raise NotFoundError(f"Reminder {reminder_id!r} not found")
+    reminder.failure_reason = reason
+    db.commit()
+    db.refresh(reminder)
+    return reminder

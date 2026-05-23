@@ -81,6 +81,11 @@ export function ReminderCard({
             <span>tts {reminder.tts_status}</span>
           ) : null}
         </div>
+        {reminder.failure_reason ? (
+          <p className="break-words text-xs text-bmo-red">
+            {reminder.failure_reason}
+          </p>
+        ) : null}
         {cancellable ? (
           <div className="pt-1">
             <BmoButton

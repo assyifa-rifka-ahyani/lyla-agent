@@ -41,12 +41,16 @@ def queue_device_command(
     device_id: str,
     command_type: str,
     payload: dict,
+    expires_at=None,
 ) -> DeviceCommand:
     """Persist a new ``DeviceCommand`` in the ``PENDING`` state.
 
     - ``NotFoundError`` if no device with ``device_id`` exists.
     - ``ValidationError`` if ``command_type`` is not a non-blank string or
       ``payload`` is not a ``dict``.
+    - ``expires_at``: optional aware datetime after which the heartbeat
+      poller skips and FAILs the command without dispatching to the ESP.
+      ``None`` means never expires.
     """
     device = db.query(Device).filter(Device.id == device_id).one_or_none()
     if device is None:
@@ -63,6 +67,7 @@ def queue_device_command(
         command_type=command_type,
         payload=payload,
         status=DeviceCommandStatus.PENDING,
+        expires_at=expires_at,
     )
     db.add(command)
     db.commit()

@@ -18,3 +18,4 @@ class ReminderOut(BaseModel):
     status: str
     created_at: Optional[datetime] = None
     tts_status: Optional[str] = None
+    failure_reason: Optional[str] = None

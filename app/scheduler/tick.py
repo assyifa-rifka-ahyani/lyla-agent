@@ -26,11 +26,17 @@ APScheduler job and tests can both call it without sharing session state.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Callable, Optional
 
 from app.audio import reminder_tts
 from app.models.device import Device
 from app.services import device_service, reminder_service
+from app.utils.timezone import now_utc
+
+
+COMMAND_EXPIRY_AFTER_DUE = timedelta(minutes=30)
+DEVICE_ONLINE_WINDOW = timedelta(minutes=5)
 
 
 def _build_reminder_command_payload(
@@ -64,6 +70,18 @@ def _build_reminder_command_payload(
     }
 
 
+def _device_is_fresh(device: Device, now) -> bool:
+    """Return True when device has heartbeat-ed within the online window."""
+    last = device.last_seen_at
+    if last is None:
+        return False
+    if last.tzinfo is None:
+        from datetime import timezone as _tz
+
+        last = last.replace(tzinfo=_tz.utc)
+    return (now - last) < DEVICE_ONLINE_WINDOW
+
+
 def reminder_tick(
     *,
     db_factory: Callable,
@@ -93,6 +111,7 @@ def reminder_tick(
     db = db_factory()
     try:
         due = reminder_service.list_due_reminders(db)
+        now = now_utc()
         for reminder in due:
             try:
                 channel = reminder.channel
@@ -104,17 +123,33 @@ def reminder_tick(
                         .all()
                     )
                     if user_devices:
+                        device = user_devices[0]
+                        if not _device_is_fresh(device, now):
+                            reminder_service.update_reminder_failure_reason(
+                                db, reminder.id, "device offline saat reminder jatuh tempo"
+                            )
+                            reminder_service.mark_reminder_failed(db, reminder.id)
+                            failed += 1
+                            continue
+
                         tts_ready = reminder_tts.synthesize_for_reminder(
                             db, reminder.id
                         )
                         command_type, payload = _build_reminder_command_payload(
                             reminder, tts_ready
                         )
+                        remind_at = reminder.remind_at
+                        if remind_at is not None and remind_at.tzinfo is None:
+                            from datetime import timezone as _tz
+
+                            remind_at = remind_at.replace(tzinfo=_tz.utc)
+                        expires_at = max(remind_at, now) + COMMAND_EXPIRY_AFTER_DUE
                         device_service.queue_device_command(
                             db,
-                            user_devices[0].id,
+                            device.id,
                             command_type=command_type,
                             payload=payload,
+                            expires_at=expires_at,
                         )
                     elif channel == "device":
                         skipped += 1
@@ -125,7 +160,10 @@ def reminder_tick(
 
                 reminder_service.mark_reminder_sent(db, reminder.id)
                 sent += 1
-            except Exception:
+            except Exception as exc:
+                reminder_service.update_reminder_failure_reason(
+                    db, reminder.id, f"dispatch error: {exc!s}"[:200]
+                )
                 reminder_service.mark_reminder_failed(db, reminder.id)
                 failed += 1
     finally:

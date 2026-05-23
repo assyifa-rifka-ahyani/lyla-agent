@@ -210,6 +210,14 @@ def update_status(
     if pending:
         timestamp = now_utc()
         for cmd in pending:
+            expires_at = cmd.expires_at
+            if expires_at is not None and expires_at.tzinfo is None:
+                from datetime import timezone as _tz
+
+                expires_at = expires_at.replace(tzinfo=_tz.utc)
+            if expires_at is not None and expires_at <= timestamp:
+                cmd.status = DeviceCommandStatus.FAILED
+                continue
             pending_payload.append(
                 {
                     "command_id": cmd.id,

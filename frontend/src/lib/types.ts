@@ -145,6 +145,7 @@ export interface ReminderOut {
   status: string;
   created_at: string | null;
   tts_status: string | null;
+  failure_reason: string | null;
 }
 
 export interface StageTimings {

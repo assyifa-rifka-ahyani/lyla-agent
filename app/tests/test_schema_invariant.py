@@ -67,6 +67,9 @@ PHASE3_SCHEMA: frozenset[tuple[str, str, str]] = frozenset(
         ("reminders", "status", "VARCHAR"),
         ("reminders", "task_id", "VARCHAR"),
         ("reminders", "title", "VARCHAR"),
+        ("reminders", "tts_audio_id", "VARCHAR"),
+        ("reminders", "tts_status", "VARCHAR"),
+        ("reminders", "tts_synthesized_at", "DATETIME"),
         ("reminders", "user_id", "VARCHAR"),
         # tasks
         ("tasks", "course", "VARCHAR"),

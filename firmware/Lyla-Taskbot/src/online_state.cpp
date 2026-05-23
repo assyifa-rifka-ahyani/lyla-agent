@@ -1,5 +1,7 @@
 #include "online_state.h"
 
+#include <ArduinoJson.h>
+
 #include "audio_capture.h"
 #include "audio_playback.h"
 #include "config.h"
@@ -169,7 +171,25 @@ void online_loop(unsigned long now) {
       if (now - g_last_heartbeat_at >= LYLA_HEARTBEAT_INTERVAL_MS) {
         g_last_heartbeat_at = now;
         if (g_cfg != nullptr && network_wifi_is_connected()) {
-          (void)network_post_heartbeat(*g_cfg, true);
+          HeartbeatResult hb = network_post_heartbeat_with_commands(*g_cfg, true);
+          if (hb.ok && hb.command_count > 0) {
+            for (size_t i = 0; i < hb.command_count; ++i) {
+              const PendingCommand& cmd = hb.commands[i];
+              if (cmd.command_type == "play_reminder") {
+                Directive d;
+                if (directive_parse(cmd.payload_json, d)) {
+                  directive_dispatch(*g_cfg, d);
+                } else {
+                  LYLA_WARN("reminder directive parse failed cmd=%s",
+                            cmd.command_id.c_str());
+                }
+              } else {
+                LYLA_WARN("unknown command_type=%s id=%s",
+                          cmd.command_type.c_str(), cmd.command_id.c_str());
+              }
+              network_ack_command(*g_cfg, cmd.command_id);
+            }
+          }
         }
       }
       break;

@@ -6,6 +6,7 @@ import { UserMenu } from "./auth/UserMenu";
 const NAV_ITEMS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/app", label: "Ringkasan", end: true },
   { to: "/app/tasks", label: "Tugas" },
+  { to: "/app/reminders", label: "Pengingat" },
   { to: "/app/expenses", label: "Pengeluaran" },
   { to: "/app/logs", label: "Riwayat" },
   { to: "/app/devices", label: "Devices" },

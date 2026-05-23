@@ -10,6 +10,7 @@ import { ExpensesPage } from "./pages/ExpensesPage";
 import { LogsPage } from "./pages/LogsPage";
 import { DevicesPage } from "./pages/DevicesPage";
 import { ObservabilityPage } from "./pages/ObservabilityPage";
+import { RemindersPage } from "./pages/RemindersPage";
 import { Link } from "react-router-dom";
 import { BmoFace } from "./components/bmo/BmoFace";
 import { BmoButton } from "./components/bmo/BmoButton";
@@ -64,6 +65,7 @@ export function App() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="tasks" element={<TasksPage />} />
+        <Route path="reminders" element={<RemindersPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="devices" element={<DevicesPage />} />

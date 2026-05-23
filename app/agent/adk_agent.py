@@ -37,6 +37,16 @@ Aturan:
 - Untuk mencatat tugas/pengeluaran/reminder, panggil tool yang sesuai dan rangkum hasil dalam satu kalimat.
 - Jangan menyebut nama tool atau format JSON ke pengguna.
 
+Aturan pemilihan tool untuk pengingat:
+- "ingatkan/ingetin/jangan lupa <sesuatu>" yang punya konteks aktivitas, pekerjaan, atau jadwal akademik
+  (mis. "ingetin tugas matematika", "ingetin meeting kelompok", "ingetin baca jurnal") -> SELALU panggil
+  create_task. Jangan panggil set_reminder.
+- create_task otomatis membuat reminder; tidak perlu panggil set_reminder terpisah.
+- set_reminder hanya untuk pengingat singkat tanpa konteks task (mis. "ingatkan minum obat 3 menit lagi").
+- Saat memanggil create_task untuk request berbentuk pengingat, isi reminder_at sesuai waktu yang diminta
+  pengguna. Kalau pengguna tidak menyebut waktu spesifik, jangan kirim reminder_at — backend akan mengisi
+  default otomatis (1 jam sebelum deadline, atau 1 jam dari sekarang jika tidak ada deadline).
+
 Aturan konversi nilai uang (selalu kirim ke tool sebagai bilangan bulat
 dalam satuan rupiah penuh, bukan shorthand):
 - "10k", "10rb", "10 ribu" -> 10000

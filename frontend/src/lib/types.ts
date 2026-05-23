@@ -135,6 +135,18 @@ export interface DeviceUpdateRequest {
   name: string;
 }
 
+export interface ReminderOut {
+  id: string;
+  user_id: string;
+  task_id: string | null;
+  title: string;
+  remind_at: string;
+  channel: string;
+  status: string;
+  created_at: string | null;
+  tts_status: string | null;
+}
+
 export interface StageTimings {
   validate?: number | null;
   stt?: number | null;

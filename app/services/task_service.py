@@ -11,10 +11,20 @@ Validation order for ``create_task`` (per design):
 
 When ``reminder_at`` is supplied, a linked ``Reminder`` row is persisted in
 the same commit so that the (task, reminder) pair is atomic.
+
+Default reminder policy (Phase 14): when the caller omits ``reminder_at``
+and ``auto_reminder`` is True (the agent's default code path), the service
+materialises one of:
+    - one hour before ``deadline_at`` if a deadline is given AND that
+      moment is still in the future
+    - one hour from ``now_utc()`` otherwise
+
+This makes "ingatkan ada tugas X" produce a Task with a usable reminder
+without forcing the agent to guess a time.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -35,6 +45,20 @@ def _is_aware(dt: datetime) -> bool:
     return dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None
 
 
+def _default_reminder_at(deadline_at: Optional[datetime]) -> datetime:
+    """Pick a default ``remind_at`` for a task without explicit reminder.
+
+    Returns one hour before ``deadline_at`` when that is still in the
+    future; falls back to one hour from now otherwise.
+    """
+    now = now_utc()
+    if deadline_at is not None and _is_aware(deadline_at):
+        candidate = deadline_at - timedelta(hours=1)
+        if candidate > now:
+            return candidate
+    return now + timedelta(hours=1)
+
+
 def create_task(
     db: Session,
     user_id: str,
@@ -43,23 +67,25 @@ def create_task(
     deadline_at: Optional[datetime] = None,
     reminder_at: Optional[datetime] = None,
     priority: Optional[str] = None,
+    auto_reminder: bool = False,
 ) -> Task:
     """Persist a new ``Task`` and (optionally) a linked ``Reminder``.
 
     Returns the created ``Task``. Raises ``NotFoundError`` if ``user_id`` is
     unknown, or ``ValidationError`` when input fails validation. Persists no
     rows when validation fails.
+
+    When ``reminder_at`` is None and ``auto_reminder`` is True, applies
+    the default reminder policy documented at module level. Pass
+    ``auto_reminder=False`` (e.g. from migration tools) to opt out.
     """
-    # 1. user must exist
     user = db.query(User).filter(User.id == user_id).one_or_none()
     if user is None:
         raise NotFoundError(f"User {user_id!r} not found")
 
-    # 2. title must be non-blank
     if not isinstance(title, str) or not title.strip():
         raise ValidationError("Title must be a non-blank string")
 
-    # 3. datetime fields, if provided, must be timezone-aware
     if deadline_at is not None:
         if not isinstance(deadline_at, datetime) or not _is_aware(deadline_at):
             raise ValidationError("deadline_at must be a timezone-aware datetime")
@@ -67,7 +93,9 @@ def create_task(
         if not isinstance(reminder_at, datetime) or not _is_aware(reminder_at):
             raise ValidationError("reminder_at must be a timezone-aware datetime")
 
-    # 4. reminder_at, if provided, must not be in the past
+    if reminder_at is None and auto_reminder:
+        reminder_at = _default_reminder_at(deadline_at)
+
     if reminder_at is not None and reminder_at < now_utc():
         raise ValidationError("reminder_at must not be earlier than now")
 

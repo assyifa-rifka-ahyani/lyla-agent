@@ -32,6 +32,21 @@ struct TtsFetchResult {
   String error;
 };
 
+struct PendingCommand {
+  String command_id;
+  String command_type;
+  String payload_json;
+};
+
+constexpr size_t LYLA_MAX_COMMANDS_PER_HEARTBEAT = 4;
+
+struct HeartbeatResult {
+  bool ok;
+  int http_status;
+  PendingCommand commands[LYLA_MAX_COMMANDS_PER_HEARTBEAT];
+  size_t command_count;
+};
+
 bool network_init(const DeviceConfig& cfg);
 
 bool network_wifi_connect(uint32_t timeout_ms);
@@ -51,6 +66,11 @@ AudioPostResult network_post_audio(const DeviceConfig& cfg,
 TtsFetchResult network_get_tts(const DeviceConfig& cfg, const String& fetch_url);
 
 bool network_post_heartbeat(const DeviceConfig& cfg, bool online);
+
+HeartbeatResult network_post_heartbeat_with_commands(const DeviceConfig& cfg,
+                                                    bool online);
+
+bool network_ack_command(const DeviceConfig& cfg, const String& command_id);
 
 String network_generate_uuid_v4();
 

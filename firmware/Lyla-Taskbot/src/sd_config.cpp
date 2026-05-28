@@ -11,6 +11,8 @@ namespace {
 
 constexpr const char* kConfigPath = "/config.json";
 constexpr size_t kMaxConfigBytes = 4096;
+constexpr uint8_t kSdMountAttempts = 5;
+constexpr unsigned long kSdMountRetryDelayMs = 400;
 
 bool is_uuid_v4_like(const String& s) {
   if (s.length() != 36) return false;
@@ -36,11 +38,28 @@ ConfigLoadOutcome fail(ConfigLoadResult code, const String& detail) {
   return ConfigLoadOutcome{code, detail};
 }
 
+bool mount_sd_card() {
+  SD_MMC.setPins(LYLA_SD_CLK, LYLA_SD_CMD, LYLA_SD_D0);
+  for (uint8_t attempt = 1; attempt <= kSdMountAttempts; ++attempt) {
+    if (SD_MMC.begin("/sdcard", true)) {
+      if (attempt > 1) {
+        LYLA_LOG("SD card mounted after %u attempts", static_cast<unsigned>(attempt));
+      }
+      return true;
+    }
+    LYLA_WARN("SD mount failed attempt %u/%u",
+              static_cast<unsigned>(attempt),
+              static_cast<unsigned>(kSdMountAttempts));
+    SD_MMC.end();
+    delay(kSdMountRetryDelayMs);
+  }
+  return false;
+}
+
 }
 
 ConfigLoadOutcome load_device_config(DeviceConfig& out) {
-  SD_MMC.setPins(LYLA_SD_CLK, LYLA_SD_CMD, LYLA_SD_D0);
-  if (!SD_MMC.begin("/sdcard", true)) {
+  if (!mount_sd_card()) {
     return fail(ConfigLoadResult::SDMountFailed, "");
   }
 

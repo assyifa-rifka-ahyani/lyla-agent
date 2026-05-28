@@ -34,6 +34,7 @@ PHASE3_SCHEMA: frozenset[tuple[str, str, str]] = frozenset(
         ("device_commands", "command_type", "VARCHAR"),
         ("device_commands", "created_at", "DATETIME"),
         ("device_commands", "device_id", "VARCHAR"),
+        ("device_commands", "expires_at", "DATETIME"),
         ("device_commands", "id", "VARCHAR"),
         ("device_commands", "payload", "JSON"),
         ("device_commands", "sent_at", "DATETIME"),
@@ -62,11 +63,15 @@ PHASE3_SCHEMA: frozenset[tuple[str, str, str]] = frozenset(
         # reminders
         ("reminders", "channel", "VARCHAR"),
         ("reminders", "created_at", "DATETIME"),
+        ("reminders", "failure_reason", "VARCHAR"),
         ("reminders", "id", "VARCHAR"),
         ("reminders", "remind_at", "DATETIME"),
         ("reminders", "status", "VARCHAR"),
         ("reminders", "task_id", "VARCHAR"),
         ("reminders", "title", "VARCHAR"),
+        ("reminders", "tts_audio_id", "VARCHAR"),
+        ("reminders", "tts_status", "VARCHAR"),
+        ("reminders", "tts_synthesized_at", "DATETIME"),
         ("reminders", "user_id", "VARCHAR"),
         # tasks
         ("tasks", "course", "VARCHAR"),

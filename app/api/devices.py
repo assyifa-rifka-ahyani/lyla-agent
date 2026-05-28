@@ -196,9 +196,44 @@ def update_status(
                 detail="Device tidak ditemukan",
             )
 
+    pending = (
+        db.query(DeviceCommand)
+        .filter(
+            DeviceCommand.device_id == device.id,
+            DeviceCommand.status == DeviceCommandStatus.PENDING,
+        )
+        .with_for_update()
+        .all()
+    )
+
+    pending_payload: list[dict] = []
+    if pending:
+        timestamp = now_utc()
+        for cmd in pending:
+            expires_at = cmd.expires_at
+            if expires_at is not None and expires_at.tzinfo is None:
+                from datetime import timezone as _tz
+
+                expires_at = expires_at.replace(tzinfo=_tz.utc)
+            if expires_at is not None and expires_at <= timestamp:
+                cmd.status = DeviceCommandStatus.FAILED
+                continue
+            pending_payload.append(
+                {
+                    "command_id": cmd.id,
+                    "command_type": cmd.command_type,
+                    "payload": cmd.payload if isinstance(cmd.payload, dict) else {},
+                    "created_at": cmd.created_at.isoformat() if cmd.created_at else "",
+                }
+            )
+            cmd.status = DeviceCommandStatus.SENT
+            cmd.sent_at = timestamp
+        db.commit()
+
     return {
         "status": device.status,
         "last_seen_at": device.last_seen_at.isoformat() if device.last_seen_at else None,
+        "commands": pending_payload,
     }
 
 

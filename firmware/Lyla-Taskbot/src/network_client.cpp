@@ -367,19 +367,95 @@ TtsFetchResult network_get_tts(const DeviceConfig& cfg, const String& fetch_url)
 }
 
 bool network_post_heartbeat(const DeviceConfig& cfg, bool online) {
-  if (!network_wifi_is_connected()) return false;
+  HeartbeatResult res = network_post_heartbeat_with_commands(cfg, online);
+  return res.ok;
+}
 
-  JsonDocument doc;
-  doc["status"] = online ? "online" : "offline";
-  doc["firmware_version"] = cfg.firmware_version;
-  doc["wifi_rssi_dbm"] = network_wifi_rssi();
-  doc["battery_pct"] = -1;
-  doc["free_heap_bytes"] = (int)ESP.getFreeHeap();
+HeartbeatResult network_post_heartbeat_with_commands(const DeviceConfig& cfg,
+                                                    bool online) {
+  HeartbeatResult result{};
+  result.ok = false;
+  result.http_status = 0;
+  result.command_count = 0;
+
+  if (!network_wifi_is_connected()) return result;
+
+  JsonDocument req_doc;
+  req_doc["status"] = online ? "online" : "offline";
+  req_doc["firmware_version"] = cfg.firmware_version;
+  req_doc["wifi_rssi_dbm"] = network_wifi_rssi();
+  req_doc["battery_pct"] = -1;
+  req_doc["free_heap_bytes"] = (int)ESP.getFreeHeap();
 
   String body;
-  serializeJson(doc, body);
+  serializeJson(req_doc, body);
 
   String url = request_url(cfg, String("/devices/") + cfg.device_code + String("/status"));
+  WiFiClient* client = make_client_for(url);
+  if (client == nullptr) return result;
+  HTTPClient http;
+  http.setTimeout(LYLA_HTTP_HEARTBEAT_TIMEOUT_MS);
+  http.setReuse(false);
+  if (!http.begin(*client, url)) {
+    release_client(client);
+    return result;
+  }
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", cfg.device_token);
+  http.addHeader("User-Agent", LYLA_USER_AGENT);
+
+  int code = http.POST(body);
+  result.http_status = code;
+  if (code == HTTP_CODE_OK) {
+    String resp = http.getString();
+    JsonDocument resp_doc;
+    DeserializationError err = deserializeJson(resp_doc, resp);
+    if (!err) {
+      JsonArray cmds = resp_doc["commands"].as<JsonArray>();
+      if (!cmds.isNull()) {
+        for (JsonObject cmd : cmds) {
+          if (result.command_count >= LYLA_MAX_COMMANDS_PER_HEARTBEAT) break;
+          PendingCommand& slot = result.commands[result.command_count];
+          slot.command_id = cmd["command_id"].as<const char*>()
+              ? cmd["command_id"].as<String>() : String();
+          slot.command_type = cmd["command_type"].as<const char*>()
+              ? cmd["command_type"].as<String>() : String();
+          JsonVariant payload = cmd["payload"];
+          if (!payload.isNull()) {
+            String payload_str;
+            serializeJson(payload, payload_str);
+            slot.payload_json = payload_str;
+          }
+          if (slot.command_id.length() > 0) result.command_count++;
+        }
+      }
+    } else {
+      LYLA_WARN("heartbeat response json parse failed: %s", err.c_str());
+    }
+    result.ok = true;
+    LYLA_LOG("heartbeat OK device=%s rssi=%d cmds=%u",
+             cfg.device_code.c_str(), network_wifi_rssi(),
+             (unsigned)result.command_count);
+  } else if (code > 0) {
+    LYLA_WARN("heartbeat HTTP %d on %s/devices/%s/status",
+              code, cfg.base_url.c_str(), cfg.device_code.c_str());
+  } else {
+    LYLA_WARN("heartbeat network err %d (%s)",
+              code, HTTPClient::errorToString(code).c_str());
+  }
+  http.end();
+  release_client(client);
+  return result;
+}
+
+bool network_ack_command(const DeviceConfig& cfg, const String& command_id) {
+  if (!network_wifi_is_connected()) return false;
+  if (command_id.length() == 0) return false;
+
+  String url = request_url(
+      cfg,
+      String("/devices/") + cfg.device_code +
+          String("/commands/") + command_id + String("/ack"));
   WiFiClient* client = make_client_for(url);
   if (client == nullptr) return false;
   HTTPClient http;
@@ -389,25 +465,16 @@ bool network_post_heartbeat(const DeviceConfig& cfg, bool online) {
     release_client(client);
     return false;
   }
-  http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Token", cfg.device_token);
   http.addHeader("User-Agent", LYLA_USER_AGENT);
-
-  int code = http.POST(body);
+  int code = http.POST("");
   http.end();
   release_client(client);
   if (code == HTTP_CODE_OK) {
-    LYLA_LOG("heartbeat OK device=%s rssi=%d",
-             cfg.device_code.c_str(), network_wifi_rssi());
+    LYLA_LOG("ack ok cmd=%s", command_id.c_str());
     return true;
   }
-  if (code > 0) {
-    LYLA_WARN("heartbeat HTTP %d on %s/devices/%s/status",
-              code, cfg.base_url.c_str(), cfg.device_code.c_str());
-  } else {
-    LYLA_WARN("heartbeat network err %d (%s)",
-              code, HTTPClient::errorToString(code).c_str());
-  }
+  LYLA_WARN("ack HTTP %d cmd=%s", code, command_id.c_str());
   return false;
 }
 

@@ -156,3 +156,85 @@ def mark_reminder_failed(db: Session, reminder_id: str) -> Reminder:
     db.commit()
     db.refresh(reminder)
     return reminder
+
+
+def mark_reminder_cancelled(db: Session, reminder_id: str) -> Reminder:
+    """Mark a reminder as cancelled.
+
+    Idempotent for reminders already in ``SENT`` / ``FAILED`` /
+    ``CANCELLED`` terminal states — those are returned unchanged so the
+    cancel endpoint can be called twice safely. Only reminders still in
+    ``SCHEDULED`` actually transition.
+
+    Raises ``NotFoundError`` if no reminder with ``reminder_id`` exists.
+    """
+    reminder = db.query(Reminder).filter(Reminder.id == reminder_id).one_or_none()
+    if reminder is None:
+        raise NotFoundError(f"Reminder {reminder_id!r} not found")
+
+    if reminder.status == ReminderStatus.SCHEDULED:
+        reminder.status = ReminderStatus.CANCELLED
+        db.commit()
+        db.refresh(reminder)
+    return reminder
+
+
+def list_reminders_for_user(
+    db: Session,
+    user_id: str,
+    status: Optional[str] = None,
+) -> list[Reminder]:
+    """Return reminders owned by ``user_id``, optionally filtered by status.
+
+    Ordered by ``remind_at`` descending so the dashboard surfaces the
+    most recent (and upcoming) entries first.
+    """
+    query = db.query(Reminder).filter(Reminder.user_id == user_id)
+    if status is not None:
+        query = query.filter(Reminder.status == status)
+    return query.order_by(Reminder.remind_at.desc()).all()
+
+
+def update_reminder_tts_state(
+    db: Session,
+    reminder_id: str,
+    *,
+    tts_status: str,
+    tts_audio_id: Optional[str] = None,
+    tts_synthesized_at: Optional[datetime] = None,
+) -> Reminder:
+    """Persist TTS pipeline state on a reminder row.
+
+    ``tts_status`` is one of ``"pending"``, ``"ready"``, ``"failed"``.
+    """
+    reminder = db.query(Reminder).filter(Reminder.id == reminder_id).one_or_none()
+    if reminder is None:
+        raise NotFoundError(f"Reminder {reminder_id!r} not found")
+    reminder.tts_status = tts_status
+    if tts_audio_id is not None:
+        reminder.tts_audio_id = tts_audio_id
+    if tts_synthesized_at is not None:
+        reminder.tts_synthesized_at = tts_synthesized_at
+    db.commit()
+    db.refresh(reminder)
+    return reminder
+
+
+def update_reminder_failure_reason(
+    db: Session,
+    reminder_id: str,
+    reason: str,
+) -> Reminder:
+    """Persist a short Indonesian failure reason on the reminder row.
+
+    Stored independently from ``status`` so the dashboard can render
+    context next to the badge ("gagal · device offline ...") without
+    parsing free-form fields elsewhere.
+    """
+    reminder = db.query(Reminder).filter(Reminder.id == reminder_id).one_or_none()
+    if reminder is None:
+        raise NotFoundError(f"Reminder {reminder_id!r} not found")
+    reminder.failure_reason = reason
+    db.commit()
+    db.refresh(reminder)
+    return reminder

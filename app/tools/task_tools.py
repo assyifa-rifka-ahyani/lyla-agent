@@ -35,8 +35,15 @@ def create_task_tool(
     deadline_at=None,
     reminder_at=None,
     priority=None,
+    auto_reminder=True,
 ) -> dict:
-    """Wrap :func:`task_service.create_task` into a Tool Result Dict."""
+    """Wrap :func:`task_service.create_task` into a Tool Result Dict.
+
+    Defaults ``auto_reminder=True`` so the agent path always materialises
+    a reminder for tasks created from natural-language requests; explicit
+    callers (tests, scripts) can pass ``auto_reminder=False`` to keep the
+    pre-Phase-14 "no reminder unless asked" behavior.
+    """
     try:
         task = task_service.create_task(
             db,
@@ -46,6 +53,7 @@ def create_task_tool(
             deadline_at=deadline_at,
             reminder_at=reminder_at,
             priority=priority,
+            auto_reminder=auto_reminder,
         )
     except (ValidationError, NotFoundError, PermissionDeniedError) as e:
         return {"success": False, "type": "task", "error": str(e)}

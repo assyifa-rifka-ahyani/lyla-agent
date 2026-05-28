@@ -1,35 +1,36 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Task } from "../lib/types";
 import * as api from "../lib/api";
 import { isReady } from "../lib/env";
+import { ReminderOut } from "../lib/types";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
-import { TaskList } from "../components/TaskList";
 import { EmptyState } from "../components/EmptyState";
 import { BmoButton } from "../components/bmo/BmoButton";
+import { ReminderCard } from "../components/reminders/ReminderCard";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "", label: "Semua" },
-  { value: "pending", label: "Pending" },
-  { value: "in_progress", label: "Dalam pengerjaan" },
-  { value: "done", label: "Selesai" },
+  { value: "scheduled", label: "Dijadwalkan" },
+  { value: "sent", label: "Terkirim" },
+  { value: "failed", label: "Gagal" },
+  { value: "cancelled", label: "Dibatalkan" },
 ];
 
-export function TasksPage() {
+export function RemindersPage() {
   const ready = isReady();
   const userId = ready.ok ? ready.userId : null;
 
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [reminders, setReminders] = useState<ReminderOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [filter, setFilter] = useState<string>("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = async (uid: string, status: string) => {
     setLoading(true);
     setError(null);
     try {
-      setTasks(await api.getTasks(uid, status || undefined));
+      setReminders(await api.getReminders(uid, status || undefined));
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
@@ -41,18 +42,27 @@ export function TasksPage() {
     if (userId) void load(userId, filter);
   }, [userId, filter]);
 
-  const handleUpdate = (updated: Task) => {
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-  };
-
-  const handleDelete = (taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+  const handleCancel = async (reminderId: string) => {
+    setBusyId(reminderId);
+    try {
+      await api.cancelReminder(reminderId);
+      if (userId) await load(userId, filter);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-medium text-bmo-dark">Tugas</h1>
+        <div>
+          <h1 className="text-2xl font-medium text-bmo-dark">Pengingat</h1>
+          <p className="text-sm text-slate-500">
+            Daftar reminder yang akan diputar BMO sebagai suara saat jatuh tempo.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <div className="flex flex-wrap gap-1 rounded-md border border-bmo-border bg-surface-elev p-1">
             {STATUS_OPTIONS.map((opt) => {
@@ -93,23 +103,23 @@ export function TasksPage() {
         />
       ) : null}
       {!loading && !error ? (
-        tasks.length === 0 ? (
+        reminders.length === 0 ? (
           <EmptyState
             face="idle"
-            title="Belum ada tugas"
-            description="Coba katakan: catat tugas matematika besok jam 10 pagi. Untuk pengingat cepat tanpa task, lihat halaman Pengingat."
-            cta={
-              <Link to="/app/reminders">
-                <BmoButton variant="secondary">Lihat pengingat</BmoButton>
-              </Link>
-            }
+            title="Belum ada pengingat"
+            description="Buat tugas dengan deadline atau katakan 'ingatkan ada tugas' ke BMO untuk menjadwalkan pengingat."
           />
         ) : (
-          <TaskList
-            tasks={tasks}
-            onUpdate={handleUpdate}
-            onDelete={handleDelete}
-          />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {reminders.map((r) => (
+              <ReminderCard
+                key={r.id}
+                reminder={r}
+                onCancel={handleCancel}
+                cancelling={busyId === r.id}
+              />
+            ))}
+          </div>
         )
       ) : null}
     </section>

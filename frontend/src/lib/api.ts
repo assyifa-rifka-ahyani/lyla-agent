@@ -16,6 +16,7 @@ import {
   LoginRequest,
   MeResponse,
   RecentLogSummary,
+  ReminderOut,
   RequestTrace,
   StatsResponse,
   Task,
@@ -180,6 +181,19 @@ export const updateDevice = (
 
 export const deleteDevice = (deviceId: string): Promise<void> =>
   request<void>(`/devices/id/${encodeURIComponent(deviceId)}`, {
+    method: "DELETE",
+  });
+
+export const getReminders = (
+  userId: string,
+  status?: string,
+): Promise<ReminderOut[]> =>
+  request<ReminderOut[]>(
+    `/reminders${qs({ user_id: userId, status })}`,
+  );
+
+export const cancelReminder = (reminderId: string): Promise<void> =>
+  request<void>(`/reminders/${encodeURIComponent(reminderId)}`, {
     method: "DELETE",
   });
 

@@ -12,6 +12,7 @@ from app.api import (
     devices,
     health,
     observability,
+    reminders,
 )
 from app.api._errors import register_exception_handlers
 from app.config import settings
@@ -78,3 +79,4 @@ app.include_router(audio_tts.router)
 app.include_router(devices.router)
 app.include_router(dashboard.router)
 app.include_router(observability.router)
+app.include_router(reminders.router)

@@ -48,14 +48,23 @@ def _is_aware(dt: datetime) -> bool:
 def _default_reminder_at(deadline_at: Optional[datetime]) -> datetime:
     """Pick a default ``remind_at`` for a task without explicit reminder.
 
-    Returns one hour before ``deadline_at`` when that is still in the
-    future; falls back to one hour from now otherwise.
+    Policy:
+
+    1. If ``deadline_at`` is at least one hour in the future, fire one
+       hour before the deadline.
+    2. If ``deadline_at`` is in the future but less than one hour away,
+       fire exactly at the deadline so the user still gets a notification
+       at the moment the task is due.
+    3. Otherwise (no deadline, or deadline already in the past), fall
+       back to one hour from ``now_utc()``.
     """
     now = now_utc()
     if deadline_at is not None and _is_aware(deadline_at):
         candidate = deadline_at - timedelta(hours=1)
         if candidate > now:
             return candidate
+        if deadline_at > now:
+            return deadline_at
     return now + timedelta(hours=1)
 
 

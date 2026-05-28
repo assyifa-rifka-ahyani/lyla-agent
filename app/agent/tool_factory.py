@@ -30,7 +30,7 @@ Per the design contract:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from app.tools import (
@@ -57,6 +57,14 @@ def _parse_iso_datetime(
     :meth:`datetime.fromisoformat` does not accept ``Z`` before Python
     3.11. The closures call this helper instead of catching exceptions
     inline so each datetime field gets a consistent failure message.
+
+    Aware datetimes are normalised to UTC before being returned so the
+    service layer always stores a single canonical zone (matching the
+    "store UTC-equivalent" rule documented in ``app/models/AGENTS.md``).
+    Without this normalisation, SQLite drops ``tzinfo`` from
+    ``DateTime(timezone=True)`` columns and a ``+07:00`` deadline becomes
+    indistinguishable from a UTC one, which causes the dashboard to
+    re-shift the time by the local offset.
     """
     if value is None:
         return None, None
@@ -66,7 +74,7 @@ def _parse_iso_datetime(
     )
     if isinstance(value, datetime):
         if value.tzinfo is not None and value.tzinfo.utcoffset(value) is not None:
-            return value, None
+            return value.astimezone(timezone.utc), None
         return None, error
     if not isinstance(value, str):
         return None, error
@@ -79,7 +87,7 @@ def _parse_iso_datetime(
         return None, error
     if parsed.tzinfo is None or parsed.tzinfo.utcoffset(parsed) is None:
         return None, error
-    return parsed, None
+    return parsed.astimezone(timezone.utc), None
 
 
 def build_tools(db, user_id, device_id) -> list[Callable[..., dict]]:

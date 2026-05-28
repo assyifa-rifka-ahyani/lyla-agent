@@ -155,7 +155,7 @@ void setup() {
   delay(200);
   LYLA_LOG("boot, firmware=%s protocol=%s", LYLA_FIRMWARE_VERSION, LYLA_PROTOCOL_VERSION);
 
-  pinMode(LYLA_TOUCH_PIN, INPUT);
+  pinMode(LYLA_TOUCH_PIN, INPUT_PULLDOWN);
   pinMode(LYLA_PTT_PIN, INPUT_PULLUP);
   pinMode(LYLA_LED_PIN, OUTPUT);
   digitalWrite(LYLA_LED_PIN, LOW);

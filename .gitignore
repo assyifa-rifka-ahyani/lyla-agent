@@ -2,6 +2,11 @@
 .env
 agents/*/.env
 
+# Secrets (SSH keys, PEM files, deploy credentials) — NEVER commit
+.secrets/
+*.pem
+*.key
+
 # Python virtualenvs
 .venv/
 venv/

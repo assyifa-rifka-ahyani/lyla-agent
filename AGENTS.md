@@ -174,8 +174,25 @@ against Google's docs before changing `app/agent/runtime.py`,
 
 - Don't commit `.env`. The `.gitignore` excludes it.
 - Don't commit `*.db`, `__pycache__/`, `.hypothesis/`, `.adk/`.
+- Don't commit `.secrets/`, `*.pem`, `*.key`. The `.gitignore` excludes them.
 - Keep `.env.example` in sync when adding new settings.
 - Don't push to `main` directly. Always a feature branch + PR.
+
+## Server access (production AWS EC2)
+
+Connection facts and the SSH key live in the gitignored folder
+`.secrets/ssh/` — NEVER put server hostnames, IPs, key contents, or
+other secrets in tracked files (this file included).
+
+- Operational guide: `.secrets/ssh/SERVER_ACCESS.md`
+- Private key (user-supplied): `.secrets/ssh/layla-home.pem`
+- Session skill: `.opencode/skills/server-access/SKILL.md`
+
+When operating the server, load the `server-access` skill and read
+`.secrets/ssh/SERVER_ACCESS.md` for authoritative connection details.
+Treat the host as PRODUCTION: discover the environment before acting
+(`python3` not `python`; service name is not `lyla-agent`), run
+`alembic upgrade head` before restarting, and never force-push to `main`.
 
 ---
 

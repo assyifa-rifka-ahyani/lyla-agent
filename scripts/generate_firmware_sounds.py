@@ -1,16 +1,17 @@
-"""Generate Bahasa Indonesia WAV files for ESP32 SD card.
+"""Generate English WAV files for the ESP32 SD card.
 
-Reuses ``app.audio.tts_gemini.GeminiTtsProvider`` so the firmware sounds
-match the Gemini voice the dashboard already uses for fallback_tts.
+Synthesizes the ten static device phrases with MiMo (default, BMO voice
+clone) or Gemini. Each phrase is given a BMO emotion via the shared
+``app.audio.director_map`` so the assets do not sound flat.
 
 Output: ``firmware/Lyla-Taskbot/sd_template/sounds/*.wav``
 
 Usage:
-    python -m scripts.generate_firmware_sounds [--voice Leda] [--force]
+    python -m scripts.generate_firmware_sounds [--provider mimo|gemini] [--voice Leda] [--force]
 
-Each file is 24 kHz mono 16-bit PCM (Gemini TTS native). The firmware's
-``audio_playback`` reads the WAV header at runtime and reconfigures I2S
-to match, so 24 kHz is fine alongside the 16 kHz mic capture path.
+Each file is 24 kHz mono 16-bit PCM. The firmware's ``audio_playback``
+reads the WAV header at runtime and reconfigures I2S to match, so 24 kHz
+is fine alongside the 16 kHz mic capture path.
 
 Skips files that already exist unless ``--force`` is given. Prints a
 short summary at the end.
@@ -24,34 +25,59 @@ import time
 from pathlib import Path
 
 from app.audio._seam import ConfigurationError
+from app.audio.director_map import resolve as resolve_director
 from app.audio.tts_gemini import GeminiTtsProvider
+from app.audio.tts_mimo import MimoTtsProvider
 from app.config import settings
 
 
 PHRASES: dict[str, str] = {
-    "greet_hello.wav": "Halo!",
-    "ack_thinking.wav": "Sebentar yaa, saya pikir dulu.",
-    "ack_still_thinking.wav": "Masih dipikir nih, sabar ya.",
-    "ack_slow_network.wav": "Kayaknya internetnya lambat, tunggu sebentar.",
-    "ok_expense.wav": "Siap, pengeluarannya sudah saya catat.",
-    "ok_task.wav": "Oke, tugasnya sudah saya catat.",
-    "ok_reminder.wav": "Pengingatnya sudah saya pasang.",
-    "ok_summary.wav": "Ini ringkasan kamu hari ini.",
-    "ok_generic.wav": "Oke, sudah saya kerjakan.",
-    "err_generic.wav": "Yah maaf, ada kesalahan, coba lagi ya.",
+    "greet_hello.wav": "Hi there!",
+    "ack_thinking.wav": "Hold on, let me think.",
+    "ack_still_thinking.wav": "Still thinking, hang on.",
+    "ack_slow_network.wav": "The network seems slow, one moment.",
+    "ok_expense.wav": "Got it, I saved your expense.",
+    "ok_task.wav": "Okay, I saved your task.",
+    "ok_reminder.wav": "Your reminder is set.",
+    "ok_summary.wav": "Here is your summary for today.",
+    "ok_generic.wav": "Okay, all done.",
+    "err_generic.wav": "Oops, something went wrong, please try again.",
+}
+
+#: Maps each static asset filename to a director_map key so MiMo synthesis
+#: gives every phrase an appropriate BMO emotion instead of one flat tone.
+ASSET_DIRECTOR_KEY: dict[str, str] = {
+    "greet_hello.wav": "greet_hello",
+    "ack_thinking.wav": "thinking",
+    "ack_still_thinking.wav": "thinking",
+    "ack_slow_network.wav": "thinking",
+    "ok_expense.wav": "ok_expense",
+    "ok_task.wav": "ok_task",
+    "ok_reminder.wav": "ok_reminder",
+    "ok_summary.wav": "ok_summary",
+    "ok_generic.wav": "ok_generic",
+    "err_generic.wav": "err_generic",
 }
 
 
 def _resolve_output_dir() -> Path:
     project_root = Path(__file__).resolve().parents[1]
-    return project_root / "firmware" / "sd_template" / "sounds"
+    return project_root / "firmware" / "Lyla-Taskbot" / "sd_template" / "sounds"
 
 
 def _human_kb(num_bytes: int) -> str:
     return f"{num_bytes / 1024:.1f} KB"
 
 
-def _check_environment() -> None:
+def _check_environment(provider_name: str) -> None:
+    if provider_name == "mimo":
+        if not settings.mimo_api_key:
+            print(
+                "ERROR: MIMO_API_KEY is empty in .env. Set it before running this script.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        return
     if not settings.google_api_key:
         print(
             "ERROR: GOOGLE_API_KEY is empty in .env. Set it before running this script.",
@@ -60,8 +86,17 @@ def _check_environment() -> None:
         sys.exit(2)
 
 
-def _build_provider(voice: str) -> GeminiTtsProvider:
+def _build_provider(
+    provider_name: str, voice: str
+) -> GeminiTtsProvider | MimoTtsProvider:
     try:
+        if provider_name == "mimo":
+            return MimoTtsProvider(
+                api_key=settings.mimo_api_key,
+                base_url=settings.mimo_base_url,
+                model=settings.mimo_model,
+                voice_sample_path=settings.mimo_voice_sample_path,
+            )
         return GeminiTtsProvider(
             model=settings.audio_tts_provider_model,
             voice=voice,
@@ -73,17 +108,22 @@ def _build_provider(voice: str) -> GeminiTtsProvider:
 
 
 def _synthesize_one(
-    provider: GeminiTtsProvider,
+    provider: GeminiTtsProvider | MimoTtsProvider,
     text: str,
     out_path: Path,
     *,
+    director: str | None = None,
+    tag: str | None = None,
     retries: int = 2,
     delay_s: float = 2.0,
 ) -> int:
     last_err: Exception | None = None
     for attempt in range(retries + 1):
         try:
-            result = provider.synthesize(text)
+            if isinstance(provider, MimoTtsProvider):
+                result = provider.synthesize(text, director=director, tag=tag)
+            else:
+                result = provider.synthesize(text)
             if not result.audio_bytes:
                 raise RuntimeError("provider returned empty audio_bytes")
             out_path.write_bytes(result.audio_bytes)
@@ -108,9 +148,15 @@ def main(argv: list[str] | None = None) -> int:
         description="Generate Bahasa Indonesia WAV files for ESP32 SD card.",
     )
     parser.add_argument(
+        "--provider",
+        choices=("mimo", "gemini"),
+        default="mimo",
+        help="TTS provider to synthesize with (default: mimo).",
+    )
+    parser.add_argument(
         "--voice",
         default=settings.audio_tts_voice,
-        help=f"Gemini voice name (default: {settings.audio_tts_voice})",
+        help=f"Gemini voice name, only used with --provider gemini (default: {settings.audio_tts_voice}).",
     )
     parser.add_argument(
         "--force",
@@ -126,13 +172,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    _check_environment()
+    _check_environment(args.provider)
 
     out_dir = _resolve_output_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Output: {out_dir}")
-    print(f"Model:  {settings.audio_tts_provider_model}")
-    print(f"Voice:  {args.voice}")
+    print(f"Output:   {out_dir}")
+    print(f"Provider: {args.provider}")
+    if args.provider == "mimo":
+        print(f"Model:    {settings.mimo_model}")
+    else:
+        print(f"Model:    {settings.audio_tts_provider_model}")
+        print(f"Voice:    {args.voice}")
     print()
 
     targets: dict[str, str]
@@ -148,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         targets = PHRASES
 
-    provider = _build_provider(args.voice)
+    provider = _build_provider(args.provider, args.voice)
 
     generated = 0
     skipped = 0
@@ -166,7 +216,10 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"  GEN    {filename:<30} '{text}'")
         try:
-            size = _synthesize_one(provider, text, out_path)
+            director, tag = resolve_director(ASSET_DIRECTOR_KEY.get(filename))
+            size = _synthesize_one(
+                provider, text, out_path, director=director, tag=tag
+            )
             print(f"         -> {_human_kb(size)}")
             generated += 1
             total_bytes += size

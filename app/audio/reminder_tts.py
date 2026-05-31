@@ -20,6 +20,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.audio._seam import ConfigurationError
+from app.audio.director_map import resolve as resolve_director
 from app.audio.tts import synthesize_text
 from app.audio.tts_cache import tts_cache
 from app.services import reminder_service
@@ -62,7 +63,8 @@ def synthesize_for_reminder(
     )
 
     try:
-        result = synthesize_text(reminder.title)
+        director, tag = resolve_director("reminder_due")
+        result = synthesize_text(reminder.title, director=director, tag=tag)
     except ConfigurationError as exc:
         log.warning("reminder TTS synth config error rid=%s err=%s", reminder_id, exc)
         reminder_service.update_reminder_tts_state(

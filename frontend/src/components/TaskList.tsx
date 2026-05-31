@@ -59,6 +59,17 @@ export function TaskList({ tasks, onUpdate, onDelete }: TaskListProps) {
     }
   };
 
+  const handleInProgress = async (task: Task) => {
+    if (busyId) return;
+    setBusyId(task.id);
+    try {
+      const updated = await api.updateTask(task.id, { status: "in_progress" });
+      onUpdate?.(updated);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleDelete = async (task: Task) => {
     if (busyId) return;
     setBusyId(task.id);
@@ -112,6 +123,7 @@ export function TaskList({ tasks, onUpdate, onDelete }: TaskListProps) {
       {tasks.map((task) => {
         const isBusy = busyId === task.id;
         const isDone = task.status === "done";
+        const isInProgress = task.status === "in_progress";
         const isEditing = editingId === task.id;
 
         return (
@@ -155,6 +167,17 @@ export function TaskList({ tasks, onUpdate, onDelete }: TaskListProps) {
                     className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
                   >
                     {isBusy && !isEditing ? "Menyimpan…" : "Tandai selesai"}
+                  </button>
+                ) : null}
+
+                {!isDone && !isInProgress ? (
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => handleInProgress(task)}
+                    className="rounded border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100 disabled:opacity-50"
+                  >
+                    {isBusy && !isEditing ? "Menyimpan…" : "Mulai kerjakan"}
                   </button>
                 ) : null}
 

@@ -93,12 +93,15 @@ def _parse_amount(text: str) -> int | None:
             return amount
     return None
 
-_EXPENSE_KEYWORDS: tuple[str, ...] = ("makan", "beli", "bayar")
-_REMINDER_KEYWORDS: tuple[str, ...] = ("ingatkan", "reminder")
-_TASK_KEYWORDS: tuple[str, ...] = ("catat", "tugas")
-_SUMMARY_KEYWORDS: tuple[str, ...] = ("ringkasan", "hari ini")
+_EXPENSE_KEYWORDS: tuple[str, ...] = (
+    "makan", "beli", "bayar", "pengeluaran",
+    "spent", "spend", "buy", "bought", "pay", "paid", "expense",
+)
+_REMINDER_KEYWORDS: tuple[str, ...] = ("ingatkan", "ingetin", "reminder", "remind")
+_TASK_KEYWORDS: tuple[str, ...] = ("catat", "tugas", "note", "task", "todo")
+_SUMMARY_KEYWORDS: tuple[str, ...] = ("ringkasan", "hari ini", "summary", "today")
 
-_FALLBACK_REPLY = "Maaf, aku belum mengerti perintah itu."
+_FALLBACK_REPLY = "Sorry, I didn't understand that command."
 
 
 def _contains_any(text_lower: str, keywords: Iterable[str]) -> bool:
@@ -119,28 +122,28 @@ def _tools_by_name(tools: list[Callable[..., Any]]) -> dict[str, Callable[..., A
 
 def _reply_for_task(result: dict, title: str) -> str:
     if result.get("success") is True:
-        return f"Tugas '{title.strip()}' tercatat."
-    return f"Maaf, gagal mencatat tugas: {result.get('error', 'kesalahan tidak diketahui')}."
+        return f"Task '{title.strip()}' saved."
+    return f"Sorry, failed to save the task: {result.get('error', 'unknown error')}."
 
 
 def _reply_for_expense(result: dict, amount: int) -> str:
     if result.get("success") is True:
-        return f"Pengeluaran Rp{amount} tercatat."
-    return f"Maaf, gagal mencatat pengeluaran: {result.get('error', 'kesalahan tidak diketahui')}."
+        return f"Expense Rp{amount} saved."
+    return f"Sorry, failed to save the expense: {result.get('error', 'unknown error')}."
 
 
 def _reply_for_reminder(result: dict) -> str:
     if result.get("success") is True:
-        return "Pengingat dipasang."
-    return f"Maaf, gagal memasang pengingat: {result.get('error', 'kesalahan tidak diketahui')}."
+        return "Reminder set."
+    return f"Sorry, failed to set the reminder: {result.get('error', 'unknown error')}."
 
 
 def _reply_for_summary(result: dict) -> str:
     if result.get("success") is True:
         tasks = result.get("tasks_due_today", 0)
         total = result.get("total_expenses_today", 0)
-        return f"Hari ini ada {tasks} tugas dan pengeluaran Rp{total}."
-    return f"Maaf, gagal mengambil ringkasan: {result.get('error', 'kesalahan tidak diketahui')}."
+        return f"Today you have {tasks} tasks and Rp{total} in expenses."
+    return f"Sorry, failed to get the summary: {result.get('error', 'unknown error')}."
 
 
 async def _run_fake(

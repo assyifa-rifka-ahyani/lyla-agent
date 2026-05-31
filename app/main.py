@@ -61,7 +61,8 @@ app.add_middleware(
 @app.middleware("http")
 async def add_protocol_version_header(request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/agent/audio"):
+    path = request.url.path
+    if path.startswith("/agent/audio") or path.endswith("/tts"):
         response.headers["X-Lyla-Protocol"] = "1"
     return response
 

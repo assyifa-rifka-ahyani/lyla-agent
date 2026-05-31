@@ -11,6 +11,9 @@ from app.config import settings
 _gemini_provider = None
 _gemini_provider_lock = Lock()
 
+_mimo_provider = None
+_mimo_provider_lock = Lock()
+
 
 def _silent_wav(sample_rate: int, duration_ms: int = 100) -> bytes:
     buf = io.BytesIO()
@@ -37,7 +40,27 @@ def _get_gemini_provider():
     return _gemini_provider
 
 
-def synthesize_text(text: str) -> SynthesisResult:
+def _get_mimo_provider():
+    global _mimo_provider
+    with _mimo_provider_lock:
+        if _mimo_provider is None:
+            from app.audio.tts_mimo import MimoTtsProvider
+
+            _mimo_provider = MimoTtsProvider(
+                api_key=settings.mimo_api_key,
+                base_url=settings.mimo_base_url,
+                model=settings.mimo_model,
+                voice_sample_path=settings.mimo_voice_sample_path,
+            )
+    return _mimo_provider
+
+
+def synthesize_text(
+    text: str,
+    *,
+    director: str | None = None,
+    tag: str | None = None,
+) -> SynthesisResult:
     mode = settings.audio_tts_mode
     if mode == "fake":
         audio_bytes = _silent_wav(settings.fake_tts_sample_rate)
@@ -53,8 +76,10 @@ def synthesize_text(text: str) -> SynthesisResult:
         )
     if mode == "gemini":
         return _get_gemini_provider().synthesize(text)
+    if mode == "mimo":
+        return _get_mimo_provider().synthesize(text, director=director, tag=tag)
     raise ConfigurationError(
-        f"Unsupported AUDIO_TTS_MODE={mode!r}; expected 'fake' or 'gemini'."
+        f"Unsupported AUDIO_TTS_MODE={mode!r}; expected 'fake', 'gemini', or 'mimo'."
     )
 
 

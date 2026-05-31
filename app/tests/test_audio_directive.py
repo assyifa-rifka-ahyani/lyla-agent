@@ -4,17 +4,17 @@ from app.api._audio_directive import classify_directive
 
 
 def test_no_actions_returns_fallback_tts():
-    d = classify_directive(actions=[], reply="Algoritma adalah serangkaian langkah.")
+    d = classify_directive(actions=[], reply="An algorithm is a series of steps.")
     assert d.audio_code == "fallback_tts"
     assert d.face == "thinking"
     assert d.fetch_url is None
-    assert d.screen_text and d.screen_text.startswith("Algoritma")
+    assert d.screen_text and d.screen_text.startswith("An algorithm")
 
 
 def test_successful_expense_returns_ok_expense():
     d = classify_directive(
         actions=[{"success": True, "type": "expense", "id": "x"}],
-        reply="Pengeluaran sudah dicatat.",
+        reply="Expense saved.",
     )
     assert d.audio_code == "ok_expense"
     assert d.face == "happy"
@@ -23,7 +23,7 @@ def test_successful_expense_returns_ok_expense():
 def test_successful_task_returns_ok_task():
     d = classify_directive(
         actions=[{"success": True, "type": "task", "id": "x"}],
-        reply="Tugas dicatat.",
+        reply="Task saved.",
     )
     assert d.audio_code == "ok_task"
     assert d.face == "happy"
@@ -32,7 +32,7 @@ def test_successful_task_returns_ok_task():
 def test_successful_reminder_returns_ok_reminder():
     d = classify_directive(
         actions=[{"success": True, "type": "reminder", "id": "x"}],
-        reply="Pengingat dipasang.",
+        reply="Reminder set.",
     )
     assert d.audio_code == "ok_reminder"
     assert d.face == "happy"
@@ -41,7 +41,7 @@ def test_successful_reminder_returns_ok_reminder():
 def test_successful_summary_returns_ok_summary():
     d = classify_directive(
         actions=[{"success": True, "type": "summary"}],
-        reply="Hari ini ada 3 tugas.",
+        reply="Today you have 3 tasks.",
     )
     assert d.audio_code == "ok_summary"
     assert d.face == "neutral"
@@ -50,7 +50,7 @@ def test_successful_summary_returns_ok_summary():
 def test_failed_action_returns_err_generic():
     d = classify_directive(
         actions=[{"success": False, "type": "expense", "error": "bad"}],
-        reply="Maaf, gagal.",
+        reply="Sorry, that failed.",
     )
     assert d.audio_code == "err_generic"
     assert d.face == "sad"

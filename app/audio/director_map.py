@@ -70,8 +70,9 @@ DIRECTOR_MAP: dict[str, tuple[str, str]] = {
         "",
     ),
     "greet_hello": (
-        "Speak as BMO greeting a friend it is happy to see. Sound cheerful and "
-        "welcoming, bright and energetic.",
+        "Speak as BMO, super excited and full of energy to see a friend and "
+        "play. Sound bubbly and enthusiastic, bright and fast, almost bouncing "
+        "with joy.",
         "",
     ),
     "thinking": (

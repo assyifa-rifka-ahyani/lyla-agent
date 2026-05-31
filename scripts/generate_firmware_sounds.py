@@ -32,12 +32,12 @@ from app.config import settings
 
 
 PHRASES: dict[str, str] = {
-    "greet_hello.wav": "Hi there!",
-    "ack_thinking.wav": "Hold on, let me think.",
+    "greet_hello.wav": "BMO is ready to play!",
+    "ack_thinking.wav": "Hmm, let me think about that for a sec.",
     "ack_still_thinking.wav": "Still thinking, hang on.",
     "ack_slow_network.wav": "The network seems slow, one moment.",
     "ok_expense.wav": "Got it, I saved your expense.",
-    "ok_task.wav": "Okay, I saved your task.",
+    "ok_task.wav": "Sweet, I've got your task saved!",
     "ok_reminder.wav": "Your reminder is set.",
     "ok_summary.wav": "Here is your summary for today.",
     "ok_generic.wav": "Okay, all done.",

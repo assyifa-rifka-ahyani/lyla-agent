@@ -120,6 +120,8 @@ def reminder_tick(
                     user_devices = (
                         db.query(Device)
                         .filter(Device.user_id == reminder.user_id)
+                        .filter(Device.last_seen_at.is_not(None))
+                        .order_by(Device.last_seen_at.desc())
                         .all()
                     )
                     if user_devices:

@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     audio_tts_voice: str = "Leda"
     tts_cache_ttl_seconds: int = 300
 
+    # MiMo V2.5 voice-clone TTS settings.
+    # Used only when AUDIO_TTS_MODE == "mimo". MiMo exposes an
+    # OpenAI-compatible chat.completions endpoint; the BMO persona voice
+    # is cloned from a local reference sample (base64 data URI per request).
+    # `mimo_api_key` empty is fail-closed: the provider raises
+    # ConfigurationError instead of attempting an unauthenticated call.
+    mimo_api_key: str = ""
+    mimo_base_url: str = "https://token-plan-sgp.xiaomimimo.com/v1"
+    mimo_model: str = "mimo-v2.5-tts-voiceclone"
+    mimo_voice_sample_path: str = "voice_clone_example/bmo_voice_sample.mp3"
+
     # Phase 12 — dashboard auth + observability (internet-facing).
     # Single-user MVP. Password is scrypt-hashed via stdlib `hashlib.scrypt`;
     # generate the env value with `python -m scripts.hash_dashboard_password`.
